@@ -1,0 +1,11 @@
+# A directory of numbered images (000001.png, 000002.png, ...) at 25 fps.
+input:
+  type: images
+  path: /path/to/frames/
+  source_fps: 25
+
+output:
+  device: /dev/video10
+
+playback:
+  on_eof: hold                       # keep showing the last image

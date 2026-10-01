@@ -1,0 +1,15 @@
+# Normalise line endings: text files are stored with LF in the repository.
+* text=auto eol=lf
+
+# Shell scripts must keep LF, or bash fails with "\r: command not found".
+*.sh text eol=lf
+
+# Binary files: never change, never diff as text.
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.raw binary
+
+# Show C++ diffs with function context.
+*.cpp diff=cpp
+*.hpp diff=cpp

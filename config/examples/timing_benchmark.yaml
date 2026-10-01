@@ -1,0 +1,21 @@
+# Measure timing accuracy without any device (null output), 60 s at 60 fps.
+input:
+  type: pattern
+  pattern_size: 1280x720
+  source_fps: 60
+  pattern_frames: 600
+
+output:
+  backend: null
+  fps: 60
+
+playback:
+  on_eof: loop
+  duration: 60
+
+timing:
+  late_ms: 2
+
+diagnostics:
+  report_json: timing_report.json
+  timing_csv: timing_frames.csv

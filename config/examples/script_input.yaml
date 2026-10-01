@@ -1,0 +1,8 @@
+# Frames pushed by a script (see docs/SCRIPT_INPUT.md and tools/examples/push_frames.py).
+input:
+  type: push
+  path: /tmp/vcam.sock               # Unix socket the script connects to
+
+output:
+  device: /dev/video10
+  fps: 30                            # the camera's rate; the script's rate may differ

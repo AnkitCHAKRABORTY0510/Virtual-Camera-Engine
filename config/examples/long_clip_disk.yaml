@@ -1,0 +1,19 @@
+# A long, high-resolution clip, decoded completely BEFORE streaming into a temporary file.
+# The default stream mode already handles long clips with little RAM; use disk mode when the
+# machine is too slow to decode the clip in real time (Underflow repeats in the report).
+input:
+  path: /path/to/long_video.mp4
+
+output:
+  device: /dev/video10
+  pixel_format: i420                 # 25 % smaller than YUYV
+
+buffer:
+  mode: disk
+  spill_dir: /var/tmp                # needs free space: frames x frame size
+
+playback:
+  on_eof: loop
+
+timing:
+  lock_memory: false

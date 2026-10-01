@@ -1,0 +1,7 @@
+# Keep the Docker build context small: no build folders, no git history.
+build/
+build-*/
+.git/
+**/__pycache__/
+*.raw
+*.csv

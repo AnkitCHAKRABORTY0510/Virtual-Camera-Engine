@@ -1,0 +1,17 @@
+# Default behaviour, written out: stream any length of video with little RAM.
+# Only ~1 s of decoded frames is kept ahead of the camera (e.g. 20 MiB for 800x410).
+# Run:  ./build/bin/virtual-camera --config config/examples/low_memory_stream.yaml --input ~/Videos/clip.mp4
+input:
+  path: /path/to/video.mp4
+  decoder_threads: auto              # auto = 2 in stream mode; raise on slow CPUs with big videos
+
+output:
+  device: /dev/video10
+  pixel_format: yuyv                 # what browsers / Google Meet expect
+
+buffer:
+  mode: stream
+  read_ahead: 1                      # seconds; 0.5 = half the RAM, 2 = more cushion
+
+playback:
+  on_eof: loop

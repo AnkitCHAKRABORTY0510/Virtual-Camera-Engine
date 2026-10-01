@@ -1,0 +1,25 @@
+# Loop a video file as a 30 fps webcam on /dev/video10.
+# Run:  ./build/bin/virtual-camera --config config/examples/video_loop.yaml --input ~/Videos/clip.mp4
+input:
+  type: video
+  path: /path/to/video.mp4          # or pass --input on the command line (it wins)
+
+output:
+  backend: v4l2
+  device: /dev/video10
+  fps: 30                            # omit to use the video's own rate
+  pixel_format: yuyv                 # most compatible with webcam applications
+
+buffer:
+  mode: stream                       # default: decode while streaming, small fixed RAM
+  read_ahead: 1                      # seconds decoded ahead of the camera
+  # mode: ram                        # decode the whole clip first (needs frames x frame size of RAM)
+  memory_limit: auto
+
+playback:
+  realtime: true
+  on_eof: loop                       # loop | stop | hold
+  pause_output: hold                 # keep the camera live while paused
+
+diagnostics:
+  stats_interval: 1

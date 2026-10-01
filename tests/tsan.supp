@@ -1,0 +1,12 @@
+# ThreadSanitizer suppressions — used by `make test-tsan`.
+#
+# FFmpeg's libraries are not compiled with ThreadSanitizer, so TSan cannot see
+# the locks FFmpeg uses inside its own decoder threads ("av:..." threads) and
+# reports false races on memory FFmpeg allocates and frees. Only FFmpeg
+# internals are suppressed; races in this project's code are still reported.
+called_from_lib:libavcodec.so
+called_from_lib:libavutil.so
+called_from_lib:libavformat.so
+called_from_lib:libswscale.so
+race:libavcodec.so
+race:libavutil.so

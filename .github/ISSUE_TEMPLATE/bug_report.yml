@@ -1,0 +1,47 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! The details below let the problem be reproduced quickly.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and full output
+      description: The exact command, run with `--verbose`, and everything it printed.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `./build/bin/virtual-camera --version` (or the git commit).
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Linux distribution and CPU
+      description: e.g. "Ubuntu 24.04, x86_64" — `cat /etc/os-release; uname -m`
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment report (optional)
+      description: Output of `make env-check` (writes env_report.txt).
+      render: text
+  - type: input
+    id: consumer
+    attributes:
+      label: Application reading the camera
+      description: e.g. Google Meet in Chrome 129, OBS 30, OpenCV 4.9

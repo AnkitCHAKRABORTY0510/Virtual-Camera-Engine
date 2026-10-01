@@ -1,0 +1,158 @@
+# =============================================================================
+# CI — builds and tests Virtual Camera Engine on several Linux distributions,
+# compilers and FFmpeg versions, runs the sanitizers, builds packages and the
+# Docker image. On a version tag (v1.2.3) it also publishes a GitHub release.
+#
+# No camera device exists on CI machines: the tests use the null/file outputs
+# (the real-device tests, `make device-test`, are run by hand).
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---- Ubuntu runners: two releases (FFmpeg 4.4 and 6.1) x two compilers ----
+  ubuntu:
+    name: ${{ matrix.os }} / ${{ matrix.compiler }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: bash tools/install_deps.sh --no-camera
+      - name: Install Clang
+        if: matrix.compiler == 'clang'
+        run: sudo apt-get install -y clang
+      - name: Configure
+        run: |
+          if [ "${{ matrix.compiler }}" = clang ]; then export CXX=clang++; else export CXX=g++; fi
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVCAM_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -j "$(nproc)"
+
+  # ---- Other distributions, in their official containers --------------------
+  distro:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { image: 'debian:12',              experimental: false }
+          - { image: 'fedora:latest',          experimental: false }
+          - { image: 'archlinux:latest',       experimental: false }
+          - { image: 'opensuse/tumbleweed',    experimental: true }
+    steps:
+      - name: Tools needed by the checkout action
+        run: |
+          if command -v apt-get >/dev/null; then apt-get update && apt-get install -y git ca-certificates; fi
+          if command -v dnf >/dev/null; then dnf install -y git; fi
+          if command -v pacman >/dev/null; then pacman -Syu --noconfirm git; fi
+          if command -v zypper >/dev/null; then zypper --non-interactive install git tar gzip; fi
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: bash tools/install_deps.sh --no-camera
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j "$(nproc)"
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -j "$(nproc)"
+
+  # ---- Sanitizers ---------------------------------------------------------------
+  sanitizers:
+    name: sanitizers (${{ matrix.kind }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [debug, tsan]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: bash tools/install_deps.sh --no-camera
+      - name: Allow ThreadSanitizer's memory layout
+        # Recent kernels randomise mmap addresses more than TSan supports.
+        if: matrix.kind == 'tsan'
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Build and test
+        run: make test-${{ matrix.kind }}
+
+  # ---- Packages -------------------------------------------------------------------
+  package:
+    name: package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: bash tools/install_deps.sh --no-camera --no-tests
+      - name: Build packages
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVCAM_BUILD_TESTS=OFF
+          cmake --build build -j "$(nproc)"
+          (cd build && cpack)
+      - name: Check that the .deb installs and runs
+        run: |
+          sudo apt-get install -y ./build/virtual-camera-engine_*.deb
+          virtual-camera --version
+          virtual-camera --input pattern --output null --fast --max-frames 30 --no-stdin --quiet
+      - name: Rename packages after the Ubuntu release
+        run: |
+          mkdir dist
+          for f in build/virtual-camera-engine*.deb build/virtual-camera-engine*.tar.gz; do
+            cp "$f" "dist/$(basename "$f" | sed "s/\(\.deb\|\.tar\.gz\)$/-${{ matrix.os }}\1/")"
+          done
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.os }}
+          path: dist/*
+
+  # ---- Docker image -----------------------------------------------------------------
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t virtual-camera-engine .
+      - name: "Run it (no camera on CI: null output)"
+        run: docker run --rm virtual-camera-engine --input pattern --output null --fast --max-frames 30 --no-stdin --quiet
+
+  # ---- Release on version tags ---------------------------------------------------------
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ubuntu, distro, sanitizers, package, docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: dist
+      - name: Create GitHub release with the packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --repo "${GITHUB_REPOSITORY}" --title "${GITHUB_REF_NAME}" --generate-notes
